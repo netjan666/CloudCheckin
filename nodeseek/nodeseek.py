@@ -47,6 +47,8 @@ def main():
 
             if response.status_code == 200:
                 result = f"Account {account}: check-in successful"
+            elif "今天已完成签到" in response.text or "请勿重复操作" in response.text:
+                result = f"Account {account}: check-in successful (already completed today)"
             else:
                 failure = summarize_http_failure(response.status_code, response.text)
                 result = f"Account {account}: check-in failed — {failure}"
