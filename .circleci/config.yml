@@ -1,27 +1,31 @@
 version: 2.1
 
-orbs:
-  node: circleci/node@5.1.0
-
 jobs:
-  checkin:
+  nodeseek:
     docker:
       - image: cimg/python:3.11
     steps:
-      - checkout
+      - run:
+          name: Clone repo via HTTPS
+          command: |
+            git clone https://${GITHUB_TOKEN}@github.com/netjan666/CloudCheckin.git /tmp/repo
+            cd /tmp/repo
       - run:
           name: Install dependencies
           command: |
+            cd /tmp/repo
             python -m pip install --upgrade pip
             pip install curl_cffi python-dotenv
       - run:
-          name: Run NodeSeek check-in
+          name: Run NodeSeek sign-in
           command: |
+            cd /tmp/repo
             python -m nodeseek.nodeseek
           environment:
             NODESEEK_COOKIE: << pipeline.env.NODESEEK_COOKIE >>
             TELEGRAM_TOKEN: << pipeline.env.TELEGRAM_TOKEN >>
             TELEGRAM_CHAT_ID: << pipeline.env.TELEGRAM_CHAT_ID >>
+            GITHUB_TOKEN: << pipeline.env.GITHUB_TOKEN >>
 
 workflows:
   daily_checkin:
@@ -32,4 +36,4 @@ workflows:
             branches:
               only: [main]
     jobs:
-      - checkin
+      - nodeseek
