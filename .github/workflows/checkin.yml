@@ -15,43 +15,48 @@ jobs:
           python-version: '3.11'
       - run: pip install curl_cffi python-dotenv
       - name: Run NodeSeek sign-in
+        id: checkin
         run: |
-          python3 -c "
-          import os
+          python3 << 'PYTHON'
+          import os, json
           from curl_cffi import requests
           
           cookie = os.environ.get('NODESEEK_COOKIE', '').strip()
           if not cookie:
-              print('ERROR: NODESEEK_COOKIE not set')
+              print("ERROR: NODESEEK_COOKIE not set")
               exit(1)
           
           headers = {
               'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+              'Origin': 'https://www.nodeseek.com',
+              'Referer': 'https://www.nodeseek.com/board',
+              'Content-Type': 'application/json',
               'Cookie': cookie,
           }
           
           resp = requests.post('https://www.nodeseek.com/api/attendance?random=true', 
-                               headers=headers, impersonate='chrome136')
-          print(f'Status: {resp.status_code}')
-          print(f'Response: {resp.text}')
+                               headers=headers, impersonate='chrome136', timeout=30)
+          print(f"Status: {resp.status_code}")
+          print(f"Response: {resp.text}")
           
-          # 解析响应
-          import json
-          try:
-              data = resp.json()
-              if data.get('success') or '已完成' in resp.text:
-                  print('✅ 签到成功或今天已签到')
-                  exit(0)
-              else:
-                  print(f'❌ 签到失败: {data.get(\"message\",\"?\")}')
-                  exit(1)
-          except:
-              if '已完成' in resp.text:
-                  print('✅ 今天已完成签到')
-                  exit(0)
-              print(f'❌ 未知响应: {resp.text}')
-              exit(1)
-          "
+          # 判断成功
+          if resp.status_code == 200:
+              try:
+                  data = resp.json()
+                  if data.get('success'):
+                      print("✅ 签到成功")
+                      exit(0)
+              except:
+                  pass
+          
+          # 500 且已签到也算成功
+          if resp.status_code == 500 and '已完成' in resp.text:
+              print("✅ 今天已完成签到")
+              exit(0)
+          
+          print(f"❌ 签到失败: {resp.text[:200]}")
+          exit(1)
+          PYTHON
         env:
           NODESEEK_COOKIE: ${{ secrets.NODESEEK_COOKIE }}
       
@@ -61,5 +66,5 @@ jobs:
           curl -s -X POST \
             "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage" \
             -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
-            -d "text=NodeSeek 签到完成! $(date '+%Y-%m-%d %H:%M')" \
+            -d "text=📅 NodeSeek 签到完成! $(date '+%Y-%m-%d %H:%M')" \
             -d "parse_mode=HTML"
