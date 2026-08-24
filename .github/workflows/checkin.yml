@@ -2,7 +2,7 @@ name: NodeSeek Check-in
 
 on:
   schedule:
-    - cron: '0 2 * * *'
+    - cron: '0 2 * * *'  # UTC 2:00 = Beijing 10:00
   workflow_dispatch:
 
 jobs:
@@ -14,8 +14,52 @@ jobs:
         with:
           python-version: '3.11'
       - run: pip install curl_cffi python-dotenv
-      - run: python -m nodeseek.nodeseek
+      - name: Run NodeSeek sign-in
+        run: |
+          python3 -c "
+          import os
+          from curl_cffi import requests
+          
+          cookie = os.environ.get('NODESEEK_COOKIE', '').strip()
+          if not cookie:
+              print('ERROR: NODESEEK_COOKIE not set')
+              exit(1)
+          
+          headers = {
+              'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+              'Cookie': cookie,
+          }
+          
+          resp = requests.post('https://www.nodeseek.com/api/attendance?random=true', 
+                               headers=headers, impersonate='chrome136')
+          print(f'Status: {resp.status_code}')
+          print(f'Response: {resp.text}')
+          
+          # 解析响应
+          import json
+          try:
+              data = resp.json()
+              if data.get('success') or '已完成' in resp.text:
+                  print('✅ 签到成功或今天已签到')
+                  exit(0)
+              else:
+                  print(f'❌ 签到失败: {data.get(\"message\",\"?\")}')
+                  exit(1)
+          except:
+              if '已完成' in resp.text:
+                  print('✅ 今天已完成签到')
+                  exit(0)
+              print(f'❌ 未知响应: {resp.text}')
+              exit(1)
+          "
         env:
           NODESEEK_COOKIE: ${{ secrets.NODESEEK_COOKIE }}
-          TELEGRAM_TOKEN: ${{ secrets.TELEGRAM_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+      
+      - name: Notify Telegram
+        if: always()
+        run: |
+          curl -s -X POST \
+            "https://api.telegram.org/bot${{ secrets.TELEGRAM_TOKEN }}/sendMessage" \
+            -d "chat_id=${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -d "text=NodeSeek 签到完成! $(date '+%Y-%m-%d %H:%M')" \
+            -d "parse_mode=HTML"
