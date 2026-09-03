@@ -89,5 +89,3 @@ workflows:
           context: checkincontext
       - hcnsec:
           context: checkincontext
-          requires:
-            - nodeseek
