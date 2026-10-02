@@ -1,68 +1,16 @@
 version: 2.1
 
-commands:
-  notify-job-failure:
-    parameters:
-      source:
-        type: string
-    steps:
-      - run:
-          name: Notify Telegram about << parameters.source >> failure
-          when: on_fail
-          command: |
-            marker="/tmp/cloudcheckin-telegram-notified"
-            if [ -f "$marker" ]; then
-              echo "A platform notification was already sent; skipping fallback"
-              exit 0
-            fi
-            telegram_token=$(printf '%s' "$TELEGRAM_TOKEN" | tr -d '\r\n')
-            telegram_chat_id=$(printf '%s' "$TELEGRAM_CHAT_ID" | tr -d '\r\n')
-            if [ -z "$telegram_token" ] || [ -z "$telegram_chat_id" ]; then
-              echo "Telegram configuration is incomplete; cannot send failure fallback"
-              exit 0
-            fi
-            timestamp=$(TZ=Asia/Shanghai date '+%Y/%m/%d %H:%M:%S')
-            message="${timestamp}
-            << parameters.source >>
-            CircleCI job failed before a platform notification was sent.
-            ${CIRCLE_BUILD_URL}"
-            curl --fail --silent --show-error \
-              --request POST \
-              --data-urlencode "chat_id=${telegram_chat_id}" \
-              --data-urlencode "text=${message}" \
-              "https://api.telegram.org/bot${telegram_token}/sendMessage"
-
 jobs:
-  nodeseek:
+  noop:
     docker:
-      - image: cimg/python:3.11
+      - image: cimg/base:current
     steps:
-      - checkout
-      - run:
-          name: Install dependencies
-          command: |
-            python -m pip install --upgrade pip
-            pip install curl_cffi python-dotenv
-      - run:
-          name: Run Nodeseek signin
-          command: |
-            python -m nodeseek.nodeseek
-      - notify-job-failure:
-          source: NODESEEK
+      - run: echo "All legacy check-in tasks have been removed."
 
 workflows:
-  daily_checkin:
-    triggers:
-      - schedule:
-          cron: "0 2 * * *"
+  disabled_workflow:
+    jobs:
+      - noop:
           filters:
             branches:
-              only: [main]
-    jobs:
-      - nodeseek:
-          context: checkincontext
-
-  manual_trigger:
-    jobs:
-      - nodeseek:
-          context: checkincontext
+              ignore: /.*/
