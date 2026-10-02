@@ -50,23 +50,6 @@ jobs:
       - notify-job-failure:
           source: NODESEEK
 
-  hcnsec:
-    docker:
-      - image: cimg/python:3.11
-    steps:
-      - checkout
-      - run:
-          name: Install dependencies
-          command: |
-            python -m pip install --upgrade pip
-            pip install curl_cffi python-dotenv
-      - run:
-          name: Run hcnsec signin
-          command: |
-            python -m hcnsec.hcnsec
-      - notify-job-failure:
-          source: HCN_SEC
-
 workflows:
   daily_checkin:
     triggers:
@@ -78,14 +61,8 @@ workflows:
     jobs:
       - nodeseek:
           context: checkincontext
-      - hcnsec:
-          context: checkincontext
-          requires:
-            - nodeseek
 
   manual_trigger:
     jobs:
       - nodeseek:
-          context: checkincontext
-      - hcnsec:
           context: checkincontext
